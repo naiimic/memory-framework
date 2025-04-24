@@ -1,13 +1,13 @@
 # Memory Framework
 
-A modular and extensible framework for implementing hierarchical memory systems for AI agents. This framework simulates human-like memory processes with working memory, recent memory, and long-term memory components.
+A modular and extensible framework for implementing hierarchical memory systems for AI agents. This framework simulates human-like memory processes with working memory, short-term memory, and long-term memory components.
 
 ## 🧠 Architecture Overview
 
 This framework implements a cognitive architecture inspired by human memory systems:
 
 - **Working Memory**: Short-term, limited capacity storage for immediate processing
-- **Recent Memory**: Medium-term storage with vector embeddings for similarity retrieval
+- **Short-Term Memory**: Medium-term storage with vector embeddings for similarity retrieval
 - **Long-term Memory**: Permanent storage with semantic organization and efficient retrieval
 
 Memory flows through the system in a hierarchical manner, with summarization and forgetting mechanisms simulating natural cognitive processes.
@@ -119,16 +119,3 @@ The `ChunkedMemory` manager coordinates the flow of information between memory m
 
 - Uses sentence transformers to create vector embeddings
 - Supports multiple encoding models for different memory types
-
-## 🤝 Contributing
-
-Contributions to improve the memory framework are welcome! Please feel free to submit issues or pull requests.
-
-## 📄 License
-
-[License information here]
-
-## 📚 References
-
-- Concepts based on cognitive science research on human memory systems
-- Implements principles from the Systems for Adaptive Frameworks approach 

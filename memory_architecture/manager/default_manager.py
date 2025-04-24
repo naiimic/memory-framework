@@ -20,14 +20,14 @@ class Memory(AbstractMemoryManager):
     prompt_keys: List[str] = None
 
     workmem: Optional[BaseMemory] = None
-    recentmem: Optional[BaseMemory] = None
+    shortmem: Optional[BaseMemory] = None
     longmem: Optional[BaseMemory] = None
     memory_bank: Any = None
 
     memory_prompts: Optional[Dict[str, str]] = None
     counter: int = 0
     workmem_size_counter: int = 0
-    recentmem_size_counter: int = 0
+    shortmem_size_counter: int = 0
 
     verbose: bool = False
     name: Any = None
@@ -56,7 +56,7 @@ class Memory(AbstractMemoryManager):
         # setting up memory modules
         for key, memory_module in memory_modules.items():
             if isinstance(memory_module, functools.partial):
-                if key == "recentmem" or key == "longmem":
+                if key == "shortmem" or key == "longmem":
                     model_arg[key]["memory_type"] = key
                     model_arg[key]["memory_bank"] = memory_bank
                 setattr(self, key, memory_module(**model_arg[key]))
@@ -88,8 +88,8 @@ class Memory(AbstractMemoryManager):
                     mem_type.add(item)
                     if key == "workmem":
                         self.workmem_size_counter += 1
-                    elif key == "recentmem":
-                        self.recentmem_size_counter += 1
+                    elif key == "shortmem":
+                        self.shortmem_size_counter += 1
 
     def query(self, memory_key: str, text: str, num_memories_queried: int = 1) -> List[str]:
         memory = getattr(self, memory_key)
@@ -107,12 +107,12 @@ class Memory(AbstractMemoryManager):
 
         if self.workmem_size_counter >= self.workmem.capacity:
             self.workmem_size_counter = 0
-            self.threaded_summarize(memory_from='workmem', memory_to='recentmem', counter_name='recentmem_size_counter')
+            self.threaded_summarize(memory_from='workmem', memory_to='shortmem', counter_name='shortmem_size_counter')
 
-        if self.recentmem_size_counter >= self.recentmem.capacity:
-            self.recentmem_size_counter = 0
-            self.threaded_summarize(memory_from='recentmem', memory_to='longmem')
-            self.recentmem.clear()
+        if self.shortmem_size_counter >= self.shortmem.capacity:
+            self.shortmem_size_counter = 0
+            self.threaded_summarize(memory_from='shortmem', memory_to='longmem')
+            self.shortmem.clear()
 
         return
 
@@ -129,7 +129,7 @@ class Memory(AbstractMemoryManager):
 
         memory_vars = {
             "workmem": self._load_mem("workmem"),
-            "recentmem": "",
+            "shortmem": "",
             "longmem": "",
         }
 
@@ -138,22 +138,22 @@ class Memory(AbstractMemoryManager):
 
         if self.workmem.items:
             query_workmem = self.workmem.items[-1]
-            queried_recentmem_workmem = self.recentmem.query(
+            queried_shortmem_workmem = self.shortmem.query(
                 query_workmem,
-                num_memories_queried=self.recentmem.num_memories_queried,
+                num_memories_queried=self.shortmem.num_memories_queried,
             )
             queried_longmem_workmem = self.longmem.query(
                 query_workmem, num_memories_queried=self.longmem.num_memories_queried
             )
         else:
-            queried_recentmem_workmem = []
+            queried_shortmem_workmem = []
             queried_longmem_workmem = []
 
-        queried_recentmem = set(queried_recentmem_workmem)
+        queried_shortmem = set(queried_shortmem_workmem)
         queried_longmem = set(queried_longmem_workmem)
 
-        if queried_recentmem:
-            memory_vars.update({"recentmem": "\n".join(queried_recentmem)})
+        if queried_shortmem:
+            memory_vars.update({"shortmem": "\n".join(queried_shortmem)})
 
         if queried_longmem:
             memory_vars.update({"longmem": "\n".join(queried_longmem)})
@@ -168,13 +168,13 @@ class Memory(AbstractMemoryManager):
         if inputs.get("collect_all_data", False):
             try:
                 data = json.loads(outputs["text"])
-                data["recentmem"] = inputs["recentmem"]
+                data["shortmem"] = inputs["shortmem"]
                 data["longmem"] = inputs["longmem"]
                 outputs["text"] = json.dumps(data)
             except:
                 pass
 
-    def summarize(self, memory_from: str = "workmem", memory_to: str = "recentmem") -> str:
+    def summarize(self, memory_from: str = "workmem", memory_to: str = "shortmem") -> str:
         """Summarize memory_from and add to memory_to"""
         prompt_name = f"{memory_from}_to_{memory_to}"
 
@@ -224,14 +224,14 @@ class ChunkedMemory(AbstractMemoryManager):
     prompt_keys: List[str] = None
 
     workmem: Optional[BaseMemory] = None
-    recentmem: Optional[BaseMemory] = None
+    shortmem: Optional[BaseMemory] = None
     longmem: Optional[BaseMemory] = None
     memory_bank: Any = None
 
     memory_prompts: Optional[Dict[str, str]] = None
     counter: int = 0
     workmem_size_counter: int = 0
-    recentmem_size_counter: int = 0
+    shortmem_size_counter: int = 0
 
     verbose: bool = False
     name: Any = None
@@ -260,7 +260,7 @@ class ChunkedMemory(AbstractMemoryManager):
         # setting up memory modules
         for key, memory_module in memory_modules.items():
             if isinstance(memory_module, functools.partial):
-                if key == "recentmem" or key == "longmem":
+                if key == "shortmem" or key == "longmem":
                     model_arg[key]["memory_type"] = key
                     model_arg[key]["memory_bank"] = memory_bank
                 setattr(self, key, memory_module(**model_arg[key]))
@@ -296,8 +296,8 @@ class ChunkedMemory(AbstractMemoryManager):
                     mem_type.add(item)
                     if key == "workmem":
                         self.workmem_size_counter += 1
-                    elif key == "recentmem":
-                        self.recentmem_size_counter += 1
+                    elif key == "shortmem":
+                        self.shortmem_size_counter += 1
 
     def query(self, memory_key: str, text: str, num_memories_queried: int = 1) -> List[str]:
         memory = getattr(self, memory_key)
@@ -315,14 +315,14 @@ class ChunkedMemory(AbstractMemoryManager):
         if self.workmem_size_counter >= self.workmem.capacity:
             self.workmem_size_counter = 0
             for _mem in getattr(self, 'workmem').items:
-                getattr(self, 'recentmem').add(_mem)
-                # setattr(self, 'recentmem_size_counter', getattr(self, 'recentmem_size_counter') + 1)
-            setattr(self, 'recentmem_size_counter', getattr(self, 'recentmem').size)
+                getattr(self, 'shortmem').add(_mem)
+                # setattr(self, 'shortmem_size_counter', getattr(self, 'shortmem_size_counter') + 1)
+            setattr(self, 'shortmem_size_counter', getattr(self, 'shortmem').size)
 
-        if self.recentmem_size_counter >= self.recentmem.capacity:
-            self.recentmem_size_counter = 0
-            self.threaded_summarize(memory_from='recentmem', memory_to='longmem')
-            self.recentmem.clear()
+        if self.shortmem_size_counter >= self.shortmem.capacity:
+            self.shortmem_size_counter = 0
+            self.threaded_summarize(memory_from='shortmem', memory_to='longmem')
+            self.shortmem.clear()
 
         return
 
@@ -339,7 +339,7 @@ class ChunkedMemory(AbstractMemoryManager):
 
         memory_vars = {
             "workmem": self._load_mem("workmem"),
-            "recentmem": "",
+            "shortmem": "",
             "longmem": "",
         }
 
@@ -348,22 +348,22 @@ class ChunkedMemory(AbstractMemoryManager):
 
         if self.workmem.items:
             query_workmem = self.workmem.items[-1]
-            queried_recentmem_workmem = self.recentmem.query(
+            queried_shortmem_workmem = self.shortmem.query(
                 query_workmem,
-                num_memories_queried=self.recentmem.num_memories_queried,
+                num_memories_queried=self.shortmem.num_memories_queried,
             )
             queried_longmem_workmem = self.longmem.query(
                 query_workmem, num_memories_queried=self.longmem.num_memories_queried
             )
         else:
-            queried_recentmem_workmem = []
+            queried_shortmem_workmem = []
             queried_longmem_workmem = []
 
-        queried_recentmem = set(queried_recentmem_workmem)
+        queried_shortmem = set(queried_shortmem_workmem)
         queried_longmem = set(queried_longmem_workmem)
 
-        if queried_recentmem:
-            memory_vars.update({"recentmem": "\n".join(queried_recentmem)})
+        if queried_shortmem:
+            memory_vars.update({"shortmem": "\n".join(queried_shortmem)})
 
         if queried_longmem:
             memory_vars.update({"longmem": "\n".join(queried_longmem)})
@@ -378,13 +378,13 @@ class ChunkedMemory(AbstractMemoryManager):
         if inputs.get("collect_all_data", False):
             try:
                 data = json.loads(outputs["text"])
-                data["recentmem"] = inputs["recentmem"]
+                data["shortmem"] = inputs["shortmem"]
                 data["longmem"] = inputs["longmem"]
                 outputs["text"] = json.dumps(data)
             except:
                 pass
 
-    def summarize(self, memory_from: str = "workmem", memory_to: str = "recentmem") -> str:
+    def summarize(self, memory_from: str = "workmem", memory_to: str = "shortmem") -> str:
         """Summarize memory_from and add to memory_to"""
 
         dbscan = DBSCAN(eps=0.55, min_samples=1)
@@ -405,7 +405,7 @@ class ChunkedMemory(AbstractMemoryManager):
         clusters_list = list(clusters_dict.values())
         
         # record the number of clusters and elements
-        if memory_from == "recentmem":
+        if memory_from == "shortmem":
             print(f'len_cluster_list={len(clusters_list)}, mean_elements={clusters_list}')
             self.num_cluster_average.append(len(clusters_list))
             # for element in clusters_list:

@@ -28,7 +28,7 @@ try:
     
     # Create encoder models and rules dictionaries
     encoder_models = {"all-MiniLM-L6-v2": encoder}
-    encoder_rules = {"recentmem": "all-MiniLM-L6-v2", "longmem": "all-MiniLM-L6-v2"}
+    encoder_rules = {"shortmem": "all-MiniLM-L6-v2", "longmem": "all-MiniLM-L6-v2"}
     
     # Set encoder attributes for compatibility
     encoders.models = encoder_models
@@ -36,14 +36,14 @@ try:
     
     # Memory prompt templates
     memory_prompts = {
-        "workmem_to_recentmem": [
+        "workmem_to_shortmem": [
             "The following are some memories from {name}:",
             "{workmem}",
             "Please summarize the above memories into one concise, informative passage that preserves the key information."
         ],
-        "recentmem_to_longmem": [
+        "shortmem_to_longmem": [
             "The following are some memories from {name}:",
-            "{recentmem}",
+            "{shortmem}",
             "Please summarize the above memories into one concise, informative passage that preserves the key information."
         ]
     }
@@ -54,7 +54,7 @@ try:
     # Initialize memory modules with small capacities for demonstration
     memory_modules = {
         "workmem": MemoryStore(capacity=3),
-        "recentmem": EmbeddingMemory(capacity=5, num_memories_queried=3, encoder=encoder, name="Test Setup"),
+        "shortmem": EmbeddingMemory(capacity=5, num_memories_queried=3, encoder=encoder, name="Test Setup"),
         "longmem": EmbeddingMemory(capacity=100, num_memories_queried=3, encoder=encoder, name="Test Setup")
     }
     

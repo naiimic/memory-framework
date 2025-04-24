@@ -15,18 +15,18 @@ def serialize_to_json(obj):
 
 def save_and_log_state(iteration, total_iterations, workmem_pairs, memory_manager):
     if iteration % CONTENT_LOG_FREQUENCY == 0 or iteration == total_iterations - 1:  # Store actual content on every nth iteration.
-        recentmem_pairs = [(mem, serialize_to_json(emb)) for mem, emb in zip(memory_manager.recentmem.items, memory_manager.recentmem.items_embeddings)]
+        shortmem_pairs = [(mem, serialize_to_json(emb)) for mem, emb in zip(memory_manager.shortmem.items, memory_manager.shortmem.items_embeddings)]
         longmem_pairs = [(mem, serialize_to_json(emb)) for mem, emb in zip(memory_manager.longmem.items, memory_manager.longmem.items_embeddings)]
     else:
         # Only store memory sizes if not storing actual content.
-        recentmem_pairs = memory_manager.recentmem.size
+        shortmem_pairs = memory_manager.shortmem.size
         longmem_pairs = memory_manager.longmem.size
 
     log_entry = {
         "action": "save_state",
         "time": iteration,
         "workmem_pairs": workmem_pairs if iteration % CONTENT_LOG_FREQUENCY == 0 else len(workmem_pairs), 
-        "recentmem_pairs": recentmem_pairs,
+        "shortmem_pairs": shortmem_pairs,
         "longmem_pairs": longmem_pairs
     }
     logging.info(json.dumps(log_entry, default=serialize_to_json))
@@ -42,7 +42,7 @@ def extract_data_from_log(log_filename='memory_manager.log'):
                     data = {
                         "time": log_entry["time"],
                         "workmem_pairs": log_entry["workmem_pairs"],
-                        "recentmem_pairs": log_entry["recentmem_pairs"],
+                        "shortmem_pairs": log_entry["shortmem_pairs"],
                         "longmem_pairs": log_entry["longmem_pairs"]
                     }
                     extracted_data.append(data)
@@ -56,7 +56,7 @@ def save_to_yaml(memory_manager, saving_path):
     
     data = {
         'workmem': memory_manager.workmem.items,
-        'recentmem': memory_manager.recentmem.items,
+        'shortmem': memory_manager.shortmem.items,
         'longmem': memory_manager.longmem.items
     }
     
@@ -65,22 +65,22 @@ def save_to_yaml(memory_manager, saving_path):
 
 def plot_memory_sizes_over_time(filename, log_filename='memory_manager.log'):
     times = []
-    recentmem_sizes = []
+    shortmem_sizes = []
     longmem_sizes = []
     
     extracted_data = extract_data_from_log(log_filename)
 
     for entry in extracted_data:
         # Check if it's a list or integer
-        recent_size = len(entry['recentmem_pairs']) if isinstance(entry['recentmem_pairs'], list) else entry['recentmem_pairs']
+        recent_size = len(entry['shortmem_pairs']) if isinstance(entry['shortmem_pairs'], list) else entry['shortmem_pairs']
         long_size = len(entry['longmem_pairs']) if isinstance(entry['longmem_pairs'], list) else entry['longmem_pairs']
 
         times.append(entry['time'])
-        recentmem_sizes.append(recent_size)
+        shortmem_sizes.append(recent_size)
         longmem_sizes.append(long_size)
     
     plt.figure()
-    plt.plot(times, recentmem_sizes, label='Recent Memory Size', color='blue')
+    plt.plot(times, shortmem_sizes, label='Short-Term Memory Size', color='blue')
     plt.plot(times, longmem_sizes, label='Long Memory Size', color='red')
     plt.xlabel('Time')
     plt.ylabel('Memory Size')
@@ -92,7 +92,7 @@ def plot_memory_sizes_over_time(filename, log_filename='memory_manager.log'):
     plt.figure()
     plt.plot(np.arange(len(times)), times)
     
-    return recentmem_sizes[-1], longmem_sizes[-1]
+    return shortmem_sizes[-1], longmem_sizes[-1]
 
 def plot_cosine_similarity_embeddings(filename, workmem_pairs, memory_manager):
     workmem_embeddings = np.array([embedding for _, embedding in workmem_pairs])

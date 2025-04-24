@@ -55,7 +55,7 @@ Type 'help' to see available commands.
         
         # Create encoder models and rules dictionaries
         encoder_models = {"all-MiniLM-L6-v2": encoder}
-        encoder_rules = {"recentmem": "all-MiniLM-L6-v2", "longmem": "all-MiniLM-L6-v2"}
+        encoder_rules = {"shortmem": "all-MiniLM-L6-v2", "longmem": "all-MiniLM-L6-v2"}
         
         # Set encoder attributes for compatibility
         encoders.models = encoder_models
@@ -63,14 +63,14 @@ Type 'help' to see available commands.
         
         # Memory prompt templates
         memory_prompts = {
-            "workmem_to_recentmem": [
+            "workmem_to_shortmem": [
                 "The following are some memories from {name}:",
                 "{workmem}",
                 "Please summarize the above memories into one concise, informative passage that preserves the key information."
             ],
-            "recentmem_to_longmem": [
+            "shortmem_to_longmem": [
                 "The following are some memories from {name}:",
-                "{recentmem}",
+                "{shortmem}",
                 "Please summarize the above memories into one concise, informative passage that preserves the key information."
             ]
         }
@@ -81,7 +81,7 @@ Type 'help' to see available commands.
         # Initialize memory modules with small capacities for demonstration
         memory_modules = {
             "workmem": MemoryStore(capacity=3),  # Small capacity to see effects quickly
-            "recentmem": EmbeddingMemory(capacity=5, num_memories_queried=3, encoder=encoder, name="Interactive Memory Demo"),
+            "shortmem": EmbeddingMemory(capacity=5, num_memories_queried=3, encoder=encoder, name="Interactive Memory Demo"),
             "longmem": EmbeddingMemory(capacity=100, num_memories_queried=3, encoder=encoder, name="Interactive Memory Demo")
         }
         
@@ -110,24 +110,24 @@ Type 'help' to see available commands.
         if self.memory.workmem_size_counter >= self.memory.workmem.capacity:
             print("Working memory capacity reached - memories will be summarized on next update")
             
-        if self.memory.recentmem_size_counter >= self.memory.recentmem.capacity:
-            print("Recent memory capacity reached - memories will be summarized on next update")
+        if self.memory.shortmem_size_counter >= self.memory.shortmem.capacity:
+            print("Short-term memory capacity reached - memories will be summarized on next update")
     
     def do_update(self, arg):
         """Trigger memory update/summarization process"""
         print("Updating memory system...")
         old_workmem_count = len(self.memory.workmem.items)
-        old_recentmem_count = len(self.memory.recentmem.items)
+        old_shortmem_count = len(self.memory.shortmem.items)
         old_longmem_count = len(self.memory.longmem.items)
         
         self.memory.update()
         
         new_workmem_count = len(self.memory.workmem.items)
-        new_recentmem_count = len(self.memory.recentmem.items)
+        new_shortmem_count = len(self.memory.shortmem.items)
         new_longmem_count = len(self.memory.longmem.items)
         
         print(f"Working memory: {old_workmem_count} → {new_workmem_count} items")
-        print(f"Recent memory: {old_recentmem_count} → {new_recentmem_count} items")
+        print(f"Short-term memory: {old_shortmem_count} → {new_shortmem_count} items")
         print(f"Long-term memory: {old_longmem_count} → {new_longmem_count} items")
     
     def do_query(self, arg):
@@ -142,31 +142,31 @@ Type 'help' to see available commands.
         print("\nRetrieved Memories:")
         if memory_vars["workmem"]:
             print(f"\nFrom Working Memory:\n  {memory_vars['workmem']}")
-        if memory_vars["recentmem"]:
-            print(f"\nFrom Recent Memory:\n  {memory_vars['recentmem']}")
+        if memory_vars["shortmem"]:
+            print(f"\nFrom Short-Term Memory:\n  {memory_vars['shortmem']}")
         if memory_vars["longmem"]:
             print(f"\nFrom Long-Term Memory:\n  {memory_vars['longmem']}")
         
-        if not memory_vars["recentmem"] and not memory_vars["longmem"]:
+        if not memory_vars["shortmem"] and not memory_vars["longmem"]:
             print("  No relevant memories found.")
     
     def do_status(self, arg):
         """Show current memory system status"""
         workmem_count = len(self.memory.workmem.items) 
-        recentmem_count = len(self.memory.recentmem.items)
+        shortmem_count = len(self.memory.shortmem.items)
         longmem_count = len(self.memory.longmem.items)
         
         print("\n📊 Memory System Status:")
         print(f"Working memory: {workmem_count}/{self.memory.workmem.capacity} items")
-        print(f"Recent memory: {recentmem_count}/{self.memory.recentmem.capacity} items")
+        print(f"Short-term memory: {shortmem_count}/{self.memory.shortmem.capacity} items")
         print(f"Long-term memory: {longmem_count}/{self.memory.longmem.capacity} items")
         
         print("\nWorking Memory Contents:")
         for i, item in enumerate(self.memory.workmem.items):
             print(f"  {i+1}. {item}")
         
-        print("\nRecent Memory Contents:")
-        for i, item in enumerate(self.memory.recentmem.items):
+        print("\nShort-Term Memory Contents:")
+        for i, item in enumerate(self.memory.shortmem.items):
             print(f"  {i+1}. {item}")
         
         if longmem_count > 0:
