@@ -1,0 +1,462 @@
+from typing import Any, Dict, List, Optional, Union, ClassVar
+from langchain.chains import LLMChain
+from langchain_core.prompts import PromptTemplate
+from langchain.base_language import BaseLanguageModel
+from langchain.schema import BaseMemory
+from memory_architecture.manager.abstract_memory_manager import AbstractMemoryManager
+import functools
+from sklearn.cluster import DBSCAN
+import json
+import numpy as np
+
+class Memory(AbstractMemoryManager):
+    """Buffer for storing arbitrary memories."""
+
+    llm: BaseLanguageModel
+
+    output_key: Optional[str] = None
+    input_key: Optional[str] = None
+    memory_keys: List[str] = None
+    prompt_keys: List[str] = None
+
+    workmem: Optional[BaseMemory] = None
+    recentmem: Optional[BaseMemory] = None
+    longmem: Optional[BaseMemory] = None
+    memory_bank: Any = None
+
+    memory_prompts: Optional[Dict[str, str]] = None
+    counter: int = 0
+    workmem_size_counter: int = 0
+    recentmem_size_counter: int = 0
+
+    verbose: bool = False
+    name: Any = None
+    queried_memories: Any = None
+    
+    num_cluster_list: ClassVar[list] = []
+    num_element_list: ClassVar[list] = []
+
+    def __init__(self, memory_modules, memory_prompts, encoders, memory_bank, executor=None, **data: Any,):
+        super().__init__(**data)
+        self.memory_keys = list(memory_modules.keys())
+        self.prompt_keys = list(memory_prompts.keys())
+        self.memory_bank = memory_bank
+
+        default_model_arg = {"encoder": None, "name": self.name}
+
+        model_arg = {
+            key: {
+                "encoder": encoders.models[encoders.rules[key]],
+                "name": self.name,
+            }
+            if key in encoders.rules else default_model_arg
+            for key in self.memory_keys
+        }
+
+        # setting up memory modules
+        for key, memory_module in memory_modules.items():
+            if isinstance(memory_module, functools.partial):
+                if key == "recentmem" or key == "longmem":
+                    model_arg[key]["memory_type"] = key
+                    model_arg[key]["memory_bank"] = memory_bank
+                setattr(self, key, memory_module(**model_arg[key]))
+            else:
+                setattr(self, key, memory_module)
+
+        self.memory_prompts = {
+            key: PromptTemplate.from_template("\n".join(val) if isinstance(val, list) else val)
+            for key, val in memory_prompts.items() if key in self.prompt_keys
+        }
+
+        # Used to keep track of queried memories for data collection
+        self.queried_memories = {}
+
+    @property
+    def memory_variables(self) -> List[str]:
+        return self.memory_keys
+
+    def setup_chain(self, customized_prompt: PromptTemplate = None) -> LLMChain:
+        return LLMChain(llm=self.llm, memory=self, prompt=customized_prompt, verbose=self.verbose)
+
+    def fill_memories(self, memories: Dict[str, List]) -> None:
+        """Used to sets of memories"""
+        for key, value in memories.items():
+            if key in self.memory_keys:
+                mem_type = getattr(self, key)
+                for item in value:
+                    # mem_type.add(time=None, content=item)
+                    mem_type.add(item)
+                    if key == "workmem":
+                        self.workmem_size_counter += 1
+                    elif key == "recentmem":
+                        self.recentmem_size_counter += 1
+
+    def query(self, memory_key: str, text: str, num_memories_queried: int = 1) -> List[str]:
+        memory = getattr(self, memory_key)
+        responses = memory.query(text=text, num_memories_queried=num_memories_queried)
+        return responses
+
+    def threaded_summarize(self, memory_from, memory_to, counter_name=None):
+        _mem = self.summarize(memory_from=memory_from, memory_to=memory_to)
+        getattr(self, memory_to).add(_mem)
+        if counter_name:
+            setattr(self, counter_name, getattr(self, counter_name) + 1)
+
+    def update(self, is_last=False) -> None:
+        """Called during `slow_forward`, corresponding to conscious reflection"""
+
+        if self.workmem_size_counter >= self.workmem.capacity:
+            self.workmem_size_counter = 0
+            self.threaded_summarize(memory_from='workmem', memory_to='recentmem', counter_name='recentmem_size_counter')
+
+        if self.recentmem_size_counter >= self.recentmem.capacity:
+            self.recentmem_size_counter = 0
+            self.threaded_summarize(memory_from='recentmem', memory_to='longmem')
+            self.recentmem.clear()
+
+        return
+
+    def _load_mem(self, memory_key, k=None):
+        # if k is an integer, then this is the number of latest memory items to provide
+        k = -k if k else None
+        return "\n".join(getattr(self, memory_key).items[k:])
+
+    def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Return history buffer."""
+
+        if inputs.get("summarize", False):
+            return {}
+
+        memory_vars = {
+            "workmem": self._load_mem("workmem"),
+            "recentmem": "",
+            "longmem": "",
+        }
+
+        if inputs.get("update_world_model"):
+            pass
+
+        if self.workmem.items:
+            query_workmem = self.workmem.items[-1]
+            queried_recentmem_workmem = self.recentmem.query(
+                query_workmem,
+                num_memories_queried=self.recentmem.num_memories_queried,
+            )
+            queried_longmem_workmem = self.longmem.query(
+                query_workmem, num_memories_queried=self.longmem.num_memories_queried
+            )
+        else:
+            queried_recentmem_workmem = []
+            queried_longmem_workmem = []
+
+        queried_recentmem = set(queried_recentmem_workmem)
+        queried_longmem = set(queried_longmem_workmem)
+
+        if queried_recentmem:
+            memory_vars.update({"recentmem": "\n".join(queried_recentmem)})
+
+        if queried_longmem:
+            memory_vars.update({"longmem": "\n".join(queried_longmem)})
+        return memory_vars
+
+    def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, str]) -> None:
+        """Save context from this conversation to buffer."""
+
+        for key in self.memory_keys:
+            if key in inputs:
+                self.queried_memories[key] = inputs[key]
+        if inputs.get("collect_all_data", False):
+            try:
+                data = json.loads(outputs["text"])
+                data["recentmem"] = inputs["recentmem"]
+                data["longmem"] = inputs["longmem"]
+                outputs["text"] = json.dumps(data)
+            except:
+                pass
+
+    def summarize(self, memory_from: str = "workmem", memory_to: str = "recentmem") -> str:
+        """Summarize memory_from and add to memory_to"""
+        prompt_name = f"{memory_from}_to_{memory_to}"
+
+        chain_input = {
+            "name": self.name,
+            memory_from: "\n".join(getattr(self, memory_from).items),
+            "summarize": True,
+        }
+
+        chain = self.setup_chain(customized_prompt=self.memory_prompts[prompt_name])
+        return chain.run(chain_input)
+
+    def add(self, content: Optional[Union[dict, str]], key: str = None) -> None:
+        if key == "sense":
+            self.add_senses(content)
+        elif key == "action":
+            self.add_actions(content)
+        else:
+            self.workmem.add(content)
+            self.workmem_size_counter += 1
+
+    def add_senses(self, sense_memories: Dict[str, str]) -> None:
+        time = sense_memories.get("time", "")
+        for key, sense_memory in sense_memories.items():
+            if sense_memory not in [None, "", " ", "\n", "."]:
+                formatted_memory = f"At {time}: {sense_memory}" if key != "talk" and key != "message" else sense_memory.replace("says", "said").replace("say", "said")
+                target_memory = self.workmem
+                target_memory.add(formatted_memory)
+                counter_name = "workmem_size_counter"
+                setattr(self, counter_name, getattr(self, counter_name) + 1)
+
+    def add_actions(self, action_memories: Dict[str, str]) -> None:
+        self.add_senses(action_memories)
+
+    def clear(self) -> None:
+        for key in self.memory_keys:
+            getattr(self, key).clear()
+
+class ChunkedMemory(AbstractMemoryManager):
+    """Buffer for storing arbitrary memories."""
+
+    llm: BaseLanguageModel
+
+    output_key: Optional[str] = None
+    input_key: Optional[str] = None
+    memory_keys: List[str] = None
+    prompt_keys: List[str] = None
+
+    workmem: Optional[BaseMemory] = None
+    recentmem: Optional[BaseMemory] = None
+    longmem: Optional[BaseMemory] = None
+    memory_bank: Any = None
+
+    memory_prompts: Optional[Dict[str, str]] = None
+    counter: int = 0
+    workmem_size_counter: int = 0
+    recentmem_size_counter: int = 0
+
+    verbose: bool = False
+    name: Any = None
+    queried_memories: Any = None
+
+    num_cluster_average: ClassVar[list] = []
+    num_element_list: ClassVar[list] = []
+
+    def __init__(self, memory_modules, memory_prompts, encoders, memory_bank, executor=None, **data: Any,):
+        super().__init__(**data)
+        self.memory_keys = list(memory_modules.keys())
+        self.prompt_keys = list(memory_prompts.keys())
+        self.memory_bank = memory_bank
+
+        default_model_arg = {"encoder": None, "name": self.name}
+
+        model_arg = {
+            key: {
+                "encoder": encoders.models[encoders.rules[key]],
+                "name": self.name,
+            }
+            if key in encoders.rules else default_model_arg
+            for key in self.memory_keys
+        }
+
+        # setting up memory modules
+        for key, memory_module in memory_modules.items():
+            if isinstance(memory_module, functools.partial):
+                if key == "recentmem" or key == "longmem":
+                    model_arg[key]["memory_type"] = key
+                    model_arg[key]["memory_bank"] = memory_bank
+                setattr(self, key, memory_module(**model_arg[key]))
+            else:
+                setattr(self, key, memory_module)
+
+        self.memory_prompts = {
+            key: PromptTemplate.from_template("\n".join(val) if isinstance(val, list) else val)
+            for key, val in memory_prompts.items() if key in self.prompt_keys
+        }
+
+        # Used to keep track of queried memories for data collection
+        self.queried_memories = {}
+        
+        # Initialize these in __init__ instead of as class variables
+        # self.num_cluster_average = []
+        # self.num_element_list = []
+
+    @property
+    def memory_variables(self) -> List[str]:
+        return self.memory_keys
+
+    def setup_chain(self, customized_prompt: PromptTemplate = None) -> LLMChain:
+        return LLMChain(llm=self.llm, memory=self, prompt=customized_prompt, verbose=self.verbose)
+
+    def fill_memories(self, memories: Dict[str, List]) -> None:
+        """Used to sets of memories"""
+        for key, value in memories.items():
+            if key in self.memory_keys:
+                mem_type = getattr(self, key)
+                for item in value:
+                    # mem_type.add(time=None, content=item)
+                    mem_type.add(item)
+                    if key == "workmem":
+                        self.workmem_size_counter += 1
+                    elif key == "recentmem":
+                        self.recentmem_size_counter += 1
+
+    def query(self, memory_key: str, text: str, num_memories_queried: int = 1) -> List[str]:
+        memory = getattr(self, memory_key)
+        responses = memory.query(text=text, num_memories_queried=num_memories_queried)
+        return responses
+
+    def threaded_summarize(self, memory_from, memory_to, counter_name=None):
+        _mem = self.summarize(memory_from=memory_from, memory_to=memory_to)
+        for m in _mem:
+            getattr(self, memory_to).add(m)
+
+    def update(self, is_last=False) -> None:
+        """Called during `slow_forward`, corresponding to conscious reflection"""
+
+        if self.workmem_size_counter >= self.workmem.capacity:
+            self.workmem_size_counter = 0
+            for _mem in getattr(self, 'workmem').items:
+                getattr(self, 'recentmem').add(_mem)
+                # setattr(self, 'recentmem_size_counter', getattr(self, 'recentmem_size_counter') + 1)
+            setattr(self, 'recentmem_size_counter', getattr(self, 'recentmem').size)
+
+        if self.recentmem_size_counter >= self.recentmem.capacity:
+            self.recentmem_size_counter = 0
+            self.threaded_summarize(memory_from='recentmem', memory_to='longmem')
+            self.recentmem.clear()
+
+        return
+
+    def _load_mem(self, memory_key, k=None):
+        # if k is an integer, then this is the number of latest memory items to provide
+        k = -k if k else None
+        return "\n".join(getattr(self, memory_key).items[k:])
+
+    def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Return history buffer."""
+
+        if inputs.get("summarize", False):
+            return {}
+
+        memory_vars = {
+            "workmem": self._load_mem("workmem"),
+            "recentmem": "",
+            "longmem": "",
+        }
+
+        if inputs.get("update_world_model"):
+            pass
+
+        if self.workmem.items:
+            query_workmem = self.workmem.items[-1]
+            queried_recentmem_workmem = self.recentmem.query(
+                query_workmem,
+                num_memories_queried=self.recentmem.num_memories_queried,
+            )
+            queried_longmem_workmem = self.longmem.query(
+                query_workmem, num_memories_queried=self.longmem.num_memories_queried
+            )
+        else:
+            queried_recentmem_workmem = []
+            queried_longmem_workmem = []
+
+        queried_recentmem = set(queried_recentmem_workmem)
+        queried_longmem = set(queried_longmem_workmem)
+
+        if queried_recentmem:
+            memory_vars.update({"recentmem": "\n".join(queried_recentmem)})
+
+        if queried_longmem:
+            memory_vars.update({"longmem": "\n".join(queried_longmem)})
+        return memory_vars
+
+    def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, str]) -> None:
+        """Save context from this conversation to buffer."""
+
+        for key in self.memory_keys:
+            if key in inputs:
+                self.queried_memories[key] = inputs[key]
+        if inputs.get("collect_all_data", False):
+            try:
+                data = json.loads(outputs["text"])
+                data["recentmem"] = inputs["recentmem"]
+                data["longmem"] = inputs["longmem"]
+                outputs["text"] = json.dumps(data)
+            except:
+                pass
+
+    def summarize(self, memory_from: str = "workmem", memory_to: str = "recentmem") -> str:
+        """Summarize memory_from and add to memory_to"""
+
+        dbscan = DBSCAN(eps=0.55, min_samples=1)
+        labels = dbscan.fit_predict(getattr(self, memory_from).items_embeddings)
+        # print recent memories
+        # for recentmem in self.recentmem.items:
+        #     print(f'{i}')
+        # print the embeddings
+        # print(f'embeddings={getattr(self, memory_from).items_embeddings}')
+        
+        clusters_dict = {}
+        for idx, label in enumerate(labels):
+            if label not in clusters_dict:
+                clusters_dict[label] = []
+            
+            clusters_dict[label].append(idx)
+        
+        clusters_list = list(clusters_dict.values())
+        
+        # record the number of clusters and elements
+        if memory_from == "recentmem":
+            print(f'len_cluster_list={len(clusters_list)}, mean_elements={clusters_list}')
+            self.num_cluster_average.append(len(clusters_list))
+            # for element in clusters_list:
+                # if len(element) >= 2:
+                #     self.num_element_list.append(clusters_list)
+        
+        prompt_name = f"{memory_from}_to_{memory_to}"
+        all_items = getattr(self, memory_from).items
+
+        _mem = []
+        
+        for cluster in clusters_list:
+
+            if len(cluster) == 1:
+                _mem.append(all_items[cluster[0]])
+            else:
+                chain_input = {
+                    "name": self.name,
+                    memory_from: "\n".join([all_items[idx] for idx in cluster]),
+                    "summarize": True,
+                }
+
+                chain = self.setup_chain(customized_prompt=self.memory_prompts[prompt_name])
+                _mem.append(chain.run(chain_input))
+                
+        # print(f'_mem={_mem}')
+        
+        return _mem
+
+    def add(self, content: Optional[Union[dict, str]], key: str = None) -> None:
+        if key == "sense":
+            self.add_senses(content)
+        elif key == "action":
+            self.add_actions(content)
+        else:
+            self.workmem.add(content)
+            self.workmem_size_counter += 1
+
+    def add_senses(self, sense_memories: Dict[str, str]) -> None:
+        time = sense_memories.get("time", "")
+        for key, sense_memory in sense_memories.items():
+            if sense_memory not in [None, "", " ", "\n", "."]:
+                formatted_memory = f"At {time}: {sense_memory}" if key != "talk" and key != "message" else sense_memory.replace("says", "said").replace("say", "said")
+                target_memory = self.workmem
+                target_memory.add(formatted_memory)
+                counter_name = "workmem_size_counter"
+                setattr(self, counter_name, getattr(self, counter_name) + 1)
+
+    def add_actions(self, action_memories: Dict[str, str]) -> None:
+        self.add_senses(action_memories)
+
+    def clear(self) -> None:
+        for key in self.memory_keys:
+            getattr(self, key).clear()
