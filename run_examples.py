@@ -10,8 +10,8 @@ from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser(description='Run SaF Memory examples')
-    parser.add_argument('example', choices=['story', 'interactive', 'all'], 
-                      help='Which example to run: "story" for story_memory.py, "interactive" for interactive_memory.py, or "all" to run all examples')
+    parser.add_argument('example', choices=['story', 'interactive'], 
+                      help='Which example to run: "story" for story_memory.py, "interactive" for interactive_memory.py')
     
     args = parser.parse_args()
     
@@ -27,10 +27,6 @@ def main():
         script_path = examples_dir / 'interactive_memory.py'
         print("Running the Interactive Memory Demo...")
         run_examples([script_path], "Interactive Memory")
-    else:  # args.example == 'all'
-        script_path = examples_dir / 'story_memory.py'
-        print("Running the Story Memory example...")
-        run_examples([script_path], "Story Memory")
 
 def run_examples(script_paths, example_name):
     """Run the specified example scripts."""
@@ -58,7 +54,6 @@ if __name__ == "__main__":
         print("Please specify which example to run:")
         print("  python run_examples.py story       - Run the Story Memory example")
         print("  python run_examples.py interactive - Run the Interactive Memory Demo")
-        print("  python run_examples.py all         - Run all examples sequentially")
         sys.exit(1)
     
     main() 

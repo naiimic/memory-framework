@@ -416,7 +416,7 @@ class ChunkedMemory(AbstractMemoryManager):
         
         # record the number of clusters and elements
         if memory_from == "shortmem":
-            print(f'len_cluster_list={len(clusters_list)}, mean_elements={clusters_list}')
+        # print(f'len_cluster_list={len(clusters_list)}, mean_elements={clusters_list}')
             self.num_cluster_average.append(len(clusters_list))
         
         prompt_name = f"{memory_from}_to_{memory_to}"

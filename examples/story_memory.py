@@ -88,18 +88,18 @@ class TrackedEmbeddingMemory(EmbeddingMemory):
         
         if similar_indices:
             self.forgotten_count += len(similar_indices)
-            print(f"\n🗑️ FORGETTING TRIGGERED in {self.memory_type} memory!")
-            print(f"  Number of similar memories being forgotten: {len(similar_indices)}")
-            print(f"  Total forgotten so far: {self.forgotten_count}")
-            print(f"  Forgetting threshold: {self.forgetting_threshold}")
+            # print(f"\n🗑️ FORGETTING TRIGGERED in {self.memory_type} memory!")
+            # print(f"  Number of similar memories being forgotten: {len(similar_indices)}")
+            # print(f"  Total forgotten so far: {self.forgotten_count}")
+            # print(f"  Forgetting threshold: {self.forgetting_threshold}")
             
             # Show the similar memories that will be forgotten
-            for idx in similar_indices[:3]:  # Show at most 3 to avoid clutter
-                print(f"  Forgotten memory: \"{self.memory_bank[idx]}\"")
-                print(f"  Similarity score: {similarities[0][idx]:.4f}")
+            # for idx in similar_indices[:3]:  # Show at most 3 to avoid clutter
+            #     print(f"  Forgotten memory: \"{self.memory_bank[idx]}\"")
+            #     print(f"  Similarity score: {similarities[0][idx]:.4f}")
             
-            if len(similar_indices) > 3:
-                print(f"  ... and {len(similar_indices) - 3} more.")
+            # if len(similar_indices) > 3:
+            #     print(f"  ... and {len(similar_indices) - 3} more.")
 
         # Remove the similar memories and embeddings based on their indices
         for index in sorted(similar_indices, reverse=True):
@@ -109,20 +109,17 @@ class TrackedEmbeddingMemory(EmbeddingMemory):
 # Create a tracked version of ChunkedMemory that logs summarization
 class TrackedMemory(ChunkedMemory):
     def summarize(self, memory_from: str = "shortmem", memory_to: str = "longmem"):
-        print("\n🔍 CLUSTERING AND SUMMARIZATION INPUT:")
-        print(f"  Short-term memories to be processed ({len(self.shortmem.items)} items):")
-        for i, item in enumerate(self.shortmem.items):
-            print(f"  {i+1}. {item}")
-        
-        dbscan = DBSCAN(eps=0.55, min_samples=1)
-        labels = dbscan.fit_predict(getattr(self, memory_from).items_embeddings)
-        
+        # print("\n🔍 CLUSTERING AND SUMMARIZATION INPUT:")
+        # print(f"  Short-term memories to be processed ({len(self.shortmem.items)} items):")
+        # for i, item in enumerate(self.shortmem.items):
+        #     print(f"  {i+1}. {item}")
+           
         results = super().summarize(memory_from, memory_to)
         
-        print("\n🔄 CLUSTERING AND SUMMARIZATION RESULTS:")
-        for i, summary in enumerate(results):
-            print(f"  Cluster/Summary {i+1}: {summary}")
-        print()
+        # print("\n🔄 CLUSTERING AND SUMMARIZATION RESULTS:")
+        # for i, summary in enumerate(results):
+        #     print(f"  Cluster/Summary {i+1}: {summary}")
+        # print()
         
         return results
 
@@ -157,10 +154,10 @@ def main():
     memory_modules = {
         "workmem": MemoryStore(capacity=working_memory_capacity),
         "shortmem": TrackedEmbeddingMemory(capacity=short_term_memory_capacity, num_memories_queried=3, 
-                                            forgetting_threshold=0.9, memory_type="short-term",
+                                            forgetting_threshold=0.8, memory_type="short-term",
                                             encoder=encoder, name="Story Memory Example"),
         "longmem": TrackedEmbeddingMemory(capacity=long_term_memory_capacity, num_memories_queried=3, 
-                                           forgetting_threshold=0.9, memory_type="long-term",
+                                           forgetting_threshold=0.8, memory_type="long-term",
                                            encoder=encoder, name="Story Memory Example")
     }
     
@@ -192,17 +189,6 @@ def main():
     story_text = story_text.replace('\n', ' ').strip()
     sentences = re.split(r'(?<=[.!?])\s+', story_text)
     sentences = [s.strip() for s in sentences if s.strip()]
-    
-    # Add some duplicate sentences to better demonstrate forgetting mechanism
-    duplicated_sentences = []
-    for i, sentence in enumerate(sentences[:100]):  # Take first 100 sentences
-        if i % 10 == 0:  # Every 10th sentence
-            duplicated_sentences.append(sentence)  # Add it twice
-    
-    # Insert duplicated sentences randomly in the second half
-    for sentence in duplicated_sentences:
-        position = random.randint(len(sentences)//2, len(sentences)-1)
-        sentences.insert(position, sentence + " (duplicated)")
     
     # Set up tracking for memory sizes over time
     time_steps = []

@@ -39,11 +39,6 @@ try:
     
     # Memory prompt templates
     memory_prompts = {
-        "workmem_to_shortmem": [
-            "The following are some memories from {name}:",
-            "{workmem}",
-            "Please summarize the above memories into one concise, informative passage that preserves the key information."
-        ],
         "shortmem_to_longmem": [
             "The following are some memories from {name}:",
             "{shortmem}",
@@ -56,9 +51,9 @@ try:
     
     # Initialize memory modules with small capacities for demonstration
     memory_modules = {
-        "workmem": MemoryStore(capacity=3),
-        "shortmem": EmbeddingMemory(capacity=5, num_memories_queried=3, encoder=encoder, name="Test Setup"),
-        "longmem": EmbeddingMemory(capacity=100, num_memories_queried=3, encoder=encoder, name="Test Setup")
+        "workmem": MemoryStore(capacity=5),
+        "shortmem": EmbeddingMemory(capacity=50, num_memories_queried=3, encoder=encoder, name="Test Setup"),
+        "longmem": EmbeddingMemory(capacity=10000, num_memories_queried=3, encoder=encoder, name="Test Setup")
     }
     
     # Create memory manager
