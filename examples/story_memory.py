@@ -13,6 +13,9 @@ import json
 import logging
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
+import re
+import random
+from sklearn.cluster import DBSCAN
 
 # Add the parent directory to the path so we can import the memory_architecture module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -83,6 +86,9 @@ class TrackedMemory(ChunkedMemory):
         for i, item in enumerate(self.shortmem.items):
             print(f"  {i+1}. {item}")
         
+        dbscan = DBSCAN(eps=0.55, min_samples=1)
+        labels = dbscan.fit_predict(getattr(self, memory_from).items_embeddings)
+        
         results = super().summarize(memory_from, memory_to)
         
         print("\n🔄 CLUSTERING AND SUMMARIZATION RESULTS:")
@@ -140,8 +146,8 @@ def main():
         name="Story Memory Example"
     )
     
-    # Load text from data/little_prince.txt
-    story_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "little_prince.txt")
+    # Load text from examples/data/little_prince.txt
+    story_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "little_prince.txt")
     
     try:
         with open(story_file_path, 'r', encoding='utf-8') as file:
@@ -153,7 +159,6 @@ def main():
     # Split the text into sentences
     # This is a simple split by period, exclamation mark, and question mark
     # A more sophisticated sentence tokenizer would be better in practice
-    import re
     
     # Clean up the text and split into sentences
     story_text = story_text.replace('\n', ' ').strip()
@@ -167,7 +172,6 @@ def main():
             duplicated_sentences.append(sentence)  # Add it twice
     
     # Insert duplicated sentences randomly in the second half
-    import random
     for sentence in duplicated_sentences:
         position = random.randint(len(sentences)//2, len(sentences)-1)
         sentences.insert(position, sentence + " (duplicated)")
@@ -200,16 +204,16 @@ def main():
         
         # Show memory transitions
         if memory.workmem_size_counter >= memory.workmem.capacity:
-            print("\n⚙️ Working memory full - transferring oldest memory...")
+            # print("\n⚙️ Working memory full - transferring oldest memory...")
             oldest_memory = memory.workmem.items[0]
-            print(f"  Transferring: \"{oldest_memory}\"")
+            # print(f"  Transferring: \"{oldest_memory}\"")
             memory.update()
-            print("  ↪ Oldest memory moved to Short-Term memory\n")
+            # print("  ↪ Oldest memory moved to Short-Term memory\n")
             
         if memory.shortmem_size_counter >= memory.shortmem.capacity:
-            print("\n⚙️ Short-Term memory full - triggering summarization and clustering...")
+            # print("\n⚙️ Short-Term memory full - triggering summarization and clustering...")
             memory.update()
-            print("  ↪ Memories summarized and moved to long-term memory\n")
+            # print("  ↪ Memories summarized and moved to long-term memory\n")
     
     # Force final update to ensure all memories are processed
     memory.update()
