@@ -7,6 +7,9 @@ import os
 import sys
 from dotenv import load_dotenv
 
+# Add the parent directory to the path so we can import from the memory framework
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from memory_architecture.module.default_modules import EmbeddingMemory, MemoryStore
 from memory_architecture.manager.default_manager import ChunkedMemory
 from utils.encoder_utils import EncoderManager, SentenceTransformerEncoder
@@ -49,7 +52,7 @@ try:
     }
     
     # Initialize LLM for summarization
-    llm = ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo")
+    llm = ChatOpenAI(temperature=0, model_name="o3-mini")
     
     # Initialize memory modules with small capacities for demonstration
     memory_modules = {

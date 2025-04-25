@@ -1,0 +1,7 @@
+# Memory Framework Configuration
+
+# Memory tier capacities
+memory_capacities:
+  working_memory: 5      # Number of memories in working memory
+  short_term_memory: 50  # Number of memories in short-term memory
+  long_term_memory: 10000  # Number of memories in long-term memory 

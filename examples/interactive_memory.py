@@ -12,6 +12,7 @@ import cmd
 import json
 import logging
 from dotenv import load_dotenv
+import yaml
 
 # Add the parent directory to the path so we can import the memory_architecture module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -49,6 +50,33 @@ Type 'help' to see available commands.
         super().__init__()
         print("Initializing memory system...")
         
+        # Load memory configuration from YAML
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory_config.yaml")
+        try:
+            with open(config_path, 'r') as config_file:
+                memory_config = yaml.safe_load(config_file)
+            
+            # Get memory capacities from config
+            working_memory_capacity = memory_config['memory_capacities']['working_memory']
+            short_term_memory_capacity = memory_config['memory_capacities']['short_term_memory']
+            long_term_memory_capacity = memory_config['memory_capacities']['long_term_memory']
+            
+            print(f"\n📝 Loaded memory configuration from {config_path}")
+            print(f"  Working Memory Capacity: {working_memory_capacity}")
+            print(f"  Short-Term Memory Capacity: {short_term_memory_capacity}")
+            print(f"  Long-Term Memory Capacity: {long_term_memory_capacity}\n")
+            
+        except FileNotFoundError:
+            print(f"Warning: Configuration file {config_path} not found. Using default values.")
+            working_memory_capacity = 3
+            short_term_memory_capacity = 5
+            long_term_memory_capacity = 100
+        except Exception as e:
+            print(f"Error loading configuration: {e}. Using default values.")
+            working_memory_capacity = 3
+            short_term_memory_capacity = 5
+            long_term_memory_capacity = 100
+        
         # Setup encoder
         encoder = SentenceTransformerEncoder("all-MiniLM-L6-v2")
         encoders = EncoderManager(encoder_func=encoder)
@@ -73,11 +101,11 @@ Type 'help' to see available commands.
         # Initialize LLM for summarization
         llm = ChatOpenAI(model_name="o3-mini")
         
-        # Initialize memory modules with small capacities for demonstration
+        # Initialize memory modules with capacities from config
         memory_modules = {
-            "workmem": MemoryStore(capacity=3),  # Small capacity to see effects quickly
-            "shortmem": EmbeddingMemory(capacity=5, num_memories_queried=3, encoder=encoder, name="Interactive Memory Demo"),
-            "longmem": EmbeddingMemory(capacity=100, num_memories_queried=3, encoder=encoder, name="Interactive Memory Demo")
+            "workmem": MemoryStore(capacity=working_memory_capacity),
+            "shortmem": EmbeddingMemory(capacity=short_term_memory_capacity, num_memories_queried=3, encoder=encoder, name="Interactive Memory Demo"),
+            "longmem": EmbeddingMemory(capacity=long_term_memory_capacity, num_memories_queried=3, encoder=encoder, name="Interactive Memory Demo")
         }
         
         # Create memory manager

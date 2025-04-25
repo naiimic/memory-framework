@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 import re
 import random
 from sklearn.cluster import DBSCAN
+import yaml
 
 # Add the parent directory to the path so we can import the memory_architecture module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -40,6 +41,33 @@ if not os.environ.get("OPENAI_API_KEY"):
     print("Error: OPENAI_API_KEY not found in environment variables.")
     print("Please set your OpenAI API key in a .env file or as an environment variable.")
     sys.exit(1)
+
+# Load memory configuration from YAML
+config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory_config.yaml")
+try:
+    with open(config_path, 'r') as config_file:
+        memory_config = yaml.safe_load(config_file)
+    
+    # Get memory capacities from config
+    working_memory_capacity = memory_config['memory_capacities']['working_memory']
+    short_term_memory_capacity = memory_config['memory_capacities']['short_term_memory']
+    long_term_memory_capacity = memory_config['memory_capacities']['long_term_memory']
+    
+    print(f"\n📝 Loaded memory configuration from {config_path}")
+    print(f"  Working Memory Capacity: {working_memory_capacity}")
+    print(f"  Short-Term Memory Capacity: {short_term_memory_capacity}")
+    print(f"  Long-Term Memory Capacity: {long_term_memory_capacity}\n")
+    
+except FileNotFoundError:
+    print(f"Warning: Configuration file {config_path} not found. Using default values.")
+    working_memory_capacity = 5
+    short_term_memory_capacity = 50
+    long_term_memory_capacity = 10000
+except Exception as e:
+    print(f"Error loading configuration: {e}. Using default values.")
+    working_memory_capacity = 5
+    short_term_memory_capacity = 50
+    long_term_memory_capacity = 10000
 
 # Create a tracked version of EmbeddingMemory to log forgetting events
 class TrackedEmbeddingMemory(EmbeddingMemory):
@@ -125,13 +153,13 @@ def main():
     # Initialize LLM for summarization - using ChatOpenAI with o3-mini
     llm = ChatOpenAI(model_name="o3-mini")
     
-    # Initialize memory modules with small capacities for demonstration
+    # Initialize memory modules with capacities from config
     memory_modules = {
-        "workmem": MemoryStore(capacity=5),
-        "shortmem": TrackedEmbeddingMemory(capacity=50, num_memories_queried=3, 
+        "workmem": MemoryStore(capacity=working_memory_capacity),
+        "shortmem": TrackedEmbeddingMemory(capacity=short_term_memory_capacity, num_memories_queried=3, 
                                             forgetting_threshold=0.9, memory_type="short-term",
                                             encoder=encoder, name="Story Memory Example"),
-        "longmem": TrackedEmbeddingMemory(capacity=10000, num_memories_queried=3, 
+        "longmem": TrackedEmbeddingMemory(capacity=long_term_memory_capacity, num_memories_queried=3, 
                                            forgetting_threshold=0.9, memory_type="long-term",
                                            encoder=encoder, name="Story Memory Example")
     }

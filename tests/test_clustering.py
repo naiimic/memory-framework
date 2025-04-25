@@ -1,4 +1,4 @@
- #!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Simple script to test DBSCAN clustering on similar phrases
 """
@@ -11,7 +11,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # Add the parent directory to the path so we can import from the memory framework
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def main():
     print("\n🧠 Testing DBSCAN Clustering on Similar Phrases\n")
@@ -79,4 +79,4 @@ def main():
         print(f"  Number of clusters: {len(clusters)}")
 
 if __name__ == "__main__":
-    main()
+    main() 
