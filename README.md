@@ -12,6 +12,114 @@ This framework implements a cognitive architecture inspired by human memory syst
 
 Memory flows through the system in a hierarchical manner, with summarization and forgetting mechanisms simulating natural cognitive processes.
 
+## 🔄 Memory Flow and Mechanisms
+
+### Memory Framework Schematic
+
+```
+                                      MEMORY FRAMEWORK SCHEMATIC
+                                      -------------------------
+
++---------------------+      +----------------------+      +----------------------+
+|                     |      |                      |      |                      |
+|   WORKING MEMORY    |      |   SHORT-TERM MEMORY  |      |   LONG-TERM MEMORY   |
+|                     |      |                      |      |                      |
+| +---------------+   |      | +----------------+   |      | +----------------+   |
+| | Simple FIFO   |   |      | | Vector-based   |   |      | | Vector-based   |   |
+| | No embeddings |   |      | | Embeddings     |   |      | | Embeddings     |   |
+| | Capacity: Low |   |      | | Capacity: Med  |   |      | | Capacity: High |   |
+| +---------------+   |      | +----------------+   |      | +----------------+   |
+|                     |      |                      |      |                      |
++----------+----------+      +-----------+----------+      +-----------+----------+
+           |                             |                             |
+           | New Information             | When capacity reached       | When capacity reached
+           | enters here                 | or relevance triggered      | or periodically
+           ↓                             ↓                             ↓
++----------+----------+      +-----------+----------+      +-----------+----------+
+|                     |      |                      |      |                      |
+|    DIRECT STORE     |      |   SUMMARIZATION      |      |      CLUSTERING      |
+|                     |      |                      |      |                      |
+| Raw text storage    |      | LLM summarizes       |      | Groups similar       |
+| FIFO queue          |      | multiple memories    |      | memories using       |
+| No processing       |      | into concise form    |      | DBSCAN algorithm     |
+|                     |      |                      |      |                      |
++----------+----------+      +-----------+----------+      +-----------+----------+
+           |                             |                             |
+           | When capacity               | After summarization         | After clustering
+           | is reached                  |                             |
+           ↓                             ↓                             ↓
++-----------------------+    +-----------+----------+      +-----------+----------+
+|                       |    |                      |      |                      |
+| SUMMARIZATION & MOVE  |    |  EMBEDDING & MOVE    |      |     FORGETTING       |
+|                       |    |                      |      |                      |
+| LLM summarizes WM     |    | Convert to vectors   |      | Compare similarity   |
+| content and moves     +--->+ and store in LTM     |      | Remove redundant     |
+| to STM                |    | with metadata        +----->+ memories that exceed |
+|                       |    |                      |      | similarity threshold |
++-----------------------+    +----------------------+      +----------------------+
+
+                                          ↓
+
+                             +-----------------------+
+                             |                       |
+                             |  MEMORY RETRIEVAL     |
+                             |                       |
+                             | 1. Query converted    |
+                             |    to embedding       |
+                             | 2. Similarity search  |
+                             | 3. Most relevant      |
+                             |    memories returned  |
+                             |                       |
+                             +-----------------------+
+```
+
+### Memory Types
+
+1. **Working Memory (WM)**
+   - Implemented as a simple FIFO (First-In-First-Out) queue with fixed capacity
+   - No vector embeddings, just direct storage of text strings
+   - When capacity is reached, oldest memories are summarized and moved to Short-Term Memory
+   - Primary purpose: Immediate context and recent information processing
+
+2. **Short-Term Memory (STM)**
+   - Implemented using vector embeddings for semantic similarity search
+   - Limited capacity (larger than WM but smaller than LTM)
+   - When capacity is reached, content is summarized, clustered, and moved to Long-Term Memory
+   - Primary purpose: Recent context retrieval and filtering information before long-term storage
+
+3. **Long-Term Memory (LTM)**
+   - Highest capacity, persistent storage using vector embeddings
+   - Organized using semantic clustering for efficient retrieval
+   - Implements forgetting mechanisms to manage redundant information
+   - Primary purpose: Permanent knowledge storage with semantic retrieval capability
+
+### Key Processes
+
+#### Memory Flow
+1. New information enters Working Memory
+2. When WM reaches capacity, content is summarized via LLM and moved to Short-Term Memory
+3. When STM reaches capacity, content is summarized and moved to Long-Term Memory
+4. At each stage, memory is converted to vector embeddings (except for WM)
+
+#### Forgetting Mechanism
+The system implements a similarity-based forgetting algorithm:
+- When new memories are added to STM or LTM, they are compared to existing memories
+- If similarity exceeds a threshold (default: 0.9), the older similar memories are removed
+- This prevents redundant storage while preserving unique information
+
+#### Clustering
+Long-term memory implements semantic clustering:
+- Uses algorithms like DBSCAN to group semantically similar memories
+- Improves retrieval efficiency by organizing memories by topic
+- Helps with summarization by identifying related information
+
+#### Memory Retrieval
+When the system needs to retrieve information:
+1. A query is converted to the same vector embedding format
+2. Similarity search is performed across all memory stores
+3. Most relevant memories from each store are returned based on similarity scores
+4. Content from Working Memory is always included in the context
+
 ## 📦 Project Structure
 
 ```
