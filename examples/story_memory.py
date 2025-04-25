@@ -11,6 +11,7 @@ import os
 import sys
 import json
 import logging
+import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 
 # Add the parent directory to the path so we can import the memory_architecture module
@@ -36,6 +37,23 @@ if not os.environ.get("OPENAI_API_KEY"):
     print("Please set your OpenAI API key in a .env file or as an environment variable.")
     sys.exit(1)
 
+# Create a tracked version of ChunkedMemory that logs summarization
+class TrackedMemory(ChunkedMemory):
+    def summarize(self, memory_from: str = "shortmem", memory_to: str = "longmem"):
+        print("\n🔍 CLUSTERING AND SUMMARIZATION INPUT:")
+        print(f"  Short-term memories to be processed ({len(self.shortmem.items)} items):")
+        for i, item in enumerate(self.shortmem.items):
+            print(f"  {i+1}. {item}")
+        
+        results = super().summarize(memory_from, memory_to)
+        
+        print("\n🔄 CLUSTERING AND SUMMARIZATION RESULTS:")
+        for i, summary in enumerate(results):
+            print(f"  Cluster/Summary {i+1}: {summary}")
+        print()
+        
+        return results
+
 def main():
     print("\n🧠 Initializing Memory System...\n")
     
@@ -45,7 +63,7 @@ def main():
     
     # Create encoder models and rules dictionaries
     encoder_models = {"all-MiniLM-L6-v2": encoder}
-    encoder_rules = {"recentmem": "all-MiniLM-L6-v2", "longmem": "all-MiniLM-L6-v2"}
+    encoder_rules = {"shortmem": "all-MiniLM-L6-v2", "longmem": "all-MiniLM-L6-v2"}
     
     # Set encoder attributes for compatibility
     encoders.models = encoder_models
@@ -53,14 +71,9 @@ def main():
     
     # Memory prompt templates
     memory_prompts = {
-        "workmem_to_recentmem": [
+        "shortmem_to_longmem": [
             "The following are some memories from {name}:",
-            "{workmem}",
-            "Please summarize the above memories into one concise, informative passage that preserves the key information."
-        ],
-        "recentmem_to_longmem": [
-            "The following are some memories from {name}:",
-            "{recentmem}",
+            "{shortmem}",
             "Please summarize the above memories into one concise, informative passage that preserves the key information."
         ]
     }
@@ -71,12 +84,12 @@ def main():
     # Initialize memory modules with small capacities for demonstration
     memory_modules = {
         "workmem": MemoryStore(capacity=5),
-        "recentmem": EmbeddingMemory(capacity=10, num_memories_queried=3, encoder=encoder, name="Story Memory Example"),
-        "longmem": EmbeddingMemory(capacity=100, num_memories_queried=3, encoder=encoder, name="Story Memory Example")
+        "shortmem": EmbeddingMemory(capacity=15, num_memories_queried=3, encoder=encoder, name="Story Memory Example"),
+        "longmem": EmbeddingMemory(capacity=10000, num_memories_queried=3, encoder=encoder, name="Story Memory Example")
     }
     
-    # Create memory manager
-    memory = ChunkedMemory(
+    # Create memory manager with our tracked version
+    memory = TrackedMemory(
         llm=llm,
         memory_modules=memory_modules,
         memory_prompts=memory_prompts,
@@ -85,37 +98,58 @@ def main():
         name="Story Memory Example"
     )
     
-    # Sample story sentences from Little Prince
-    story_sentences = [
-        "Once upon a time, there was a little prince who lived on a very small planet.",
-        "On his planet, there were three tiny volcanoes and a beautiful flower.",
-        "The little prince loved to watch the sunsets on his small planet.",
-        "He could see as many as forty-four sunsets in one day by moving his chair.",
-        "The little prince decided to leave his planet to explore the universe.",
-        "He visited many planets and met strange grown-ups.",
-        "On one planet, he met a king who claimed to rule over everything.",
-        "On another planet, he met a vain man who wanted to be admired by everyone.",
-        "The third planet was inhabited by a drunkard who drank to forget.",
-        "On Earth, the little prince met a fox who taught him about friendship.",
-        "The fox said: 'One sees clearly only with the heart. What is essential is invisible to the eye.'",
-        "The little prince realized that his flower was unique because of the time he had spent caring for it.",
-        "After his journey, the little prince decided to return to his own planet."
-    ]
+    # Load text from data/little_prince.txt
+    story_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "little_prince.txt")
+    
+    try:
+        with open(story_file_path, 'r', encoding='utf-8') as file:
+            story_text = file.read()
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        sys.exit(1)
+    
+    # Split the text into sentences
+    # This is a simple split by period, exclamation mark, and question mark
+    # A more sophisticated sentence tokenizer would be better in practice
+    import re
+    
+    # Clean up the text and split into sentences
+    story_text = story_text.replace('\n', ' ').strip()
+    sentences = re.split(r'(?<=[.!?])\s+', story_text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    
+    # Set up tracking for memory sizes over time
+    time_steps = []
+    workmem_sizes = []
+    shortmem_sizes = []
+    longmem_sizes = []
     
     # Process each sentence from the story
-    print("📚 Processing story sentences...\n")
-    for i, sentence in enumerate(story_sentences):
-        print(f"Input {i+1}/{len(story_sentences)}: {sentence}")
+    print(f"📚 Processing story from {story_file_path}...\n")
+    print(f"Total sentences to process: {len(sentences)}\n")
+    
+    for i, sentence in enumerate(sentences):
+        if i % 10 == 0:  # Print progress every 10 sentences
+            print(f"Processing sentence {i+1}/{len(sentences)}")
+        
         memory.add(sentence)
+        
+        # Track memory sizes
+        time_steps.append(i)
+        workmem_sizes.append(len(memory.workmem.items))
+        shortmem_sizes.append(len(memory.shortmem.items))
+        longmem_sizes.append(len(memory.longmem.items))
         
         # Show memory transitions
         if memory.workmem_size_counter >= memory.workmem.capacity:
-            print("\n⚙️ Working memory full - triggering summarization...")
+            print("\n⚙️ Working memory full - transferring oldest memory...")
+            oldest_memory = memory.workmem.items[0]
+            print(f"  Transferring: \"{oldest_memory}\"")
             memory.update()
-            print("  ↪ Memories moved to recent memory\n")
+            print("  ↪ Oldest memory moved to Short-Term memory\n")
             
-        if memory.recentmem_size_counter >= memory.recentmem.capacity:
-            print("\n⚙️ Recent memory full - triggering summarization and clustering...")
+        if memory.shortmem_size_counter >= memory.shortmem.capacity:
+            print("\n⚙️ Short-Term memory full - triggering summarization and clustering...")
             memory.update()
             print("  ↪ Memories summarized and moved to long-term memory\n")
     
@@ -128,13 +162,36 @@ def main():
     for item in memory.workmem.items:
         print(f"  • {item}")
     
-    print("\nRecent Memory:")
-    for item in memory.recentmem.items:
+    print("\nShort-Term Memory:")
+    for item in memory.shortmem.items:
         print(f"  • {item}")
     
-    print("\nLong-Term Memory:")
-    for item in memory.longmem.items:
+    print("\nLong-Term Memory (sample of first 10 items):")
+    for i, item in enumerate(memory.longmem.items[:10]):
         print(f"  • {item}")
+    print(f"  ... plus {len(memory.longmem.items) - 10} more memories.")
+    
+    # Plot memory sizes over time
+    plt.figure(figsize=(12, 6))
+    plt.plot(time_steps, workmem_sizes, label='Working Memory', color='blue')
+    plt.plot(time_steps, shortmem_sizes, label='Short-Term Memory', color='green')
+    plt.plot(time_steps, longmem_sizes, label='Long-Term Memory', color='red')
+    plt.xlabel('Sentences Processed')
+    plt.ylabel('Number of Memories')
+    plt.title('Memory Size Evolution During Processing')
+    plt.legend()
+    plt.grid(True)
+    
+    # Save the plot
+    plot_file = "memory_evolution.png"
+    plt.savefig(plot_file)
+    print(f"\n📈 Memory evolution plot saved to {plot_file}")
+    
+    # Display plot if running in an interactive environment
+    try:
+        plt.show()
+    except:
+        pass
     
     # Query example
     print("\n🔍 Memory Query Example:\n")
@@ -145,8 +202,8 @@ def main():
     memory_vars = memory.load_memory_variables({"text": query})
     
     print("\nRetrieved Memories:")
-    if memory_vars["recentmem"]:
-        print(f"From Recent Memory:\n  {memory_vars['recentmem']}")
+    if memory_vars["shortmem"]:
+        print(f"From Short-Term memory:\n  {memory_vars['shortmem']}")
     if memory_vars["longmem"]:
         print(f"From Long-Term Memory:\n  {memory_vars['longmem']}")
 

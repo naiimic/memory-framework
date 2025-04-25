@@ -21,9 +21,6 @@ NONCE = [None, "", " ", "\n", "."]
 
 # Language Models API Keys - get from environment or .env file
 OPENAI_APIKEY = os.environ.get("OPENAI_API_KEY")
-PINECONE_APIKEY = os.environ.get("PINECONE_API_KEY")
-PINECONE_ENVIRONMENT = os.environ.get("PINECONE_ENVIRONMENT")
-PINECONE_INDEX = os.environ.get("PINECONE_INDEX")
 
 # Setting environment variables for LangChain, note that the name is different due to convention
 if OPENAI_APIKEY:
@@ -34,4 +31,3 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 if __name__ == "__main__":
     print(f"OpenAI API Key: {'Set' if OPENAI_APIKEY else 'Not Set'}")
-    print(f"Pinecone API Key: {'Set' if PINECONE_APIKEY else 'Not Set'}")

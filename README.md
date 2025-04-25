@@ -37,25 +37,25 @@ Memory flows through the system in a hierarchical manner, with summarization and
            ↓                             ↓                             ↓
 +----------+----------+      +-----------+----------+      +-----------+----------+
 |                     |      |                      |      |                      |
-|    DIRECT STORE     |      |   SUMMARIZATION      |      |      CLUSTERING      |
+|    DIRECT STORE     |      |   DIRECT TRANSFER    |      |      CLUSTERING      |
 |                     |      |                      |      |                      |
-| Raw text storage    |      | LLM summarizes       |      | Groups similar       |
-| FIFO queue          |      | multiple memories    |      | memories using       |
-| No processing       |      | into concise form    |      | DBSCAN algorithm     |
+| Raw text storage    |      | Oldest memory moved  |      | Groups similar       |
+| FIFO queue          |      | to short-term memory |      | memories using       |
+| No processing       |      | without summarizing  |      | DBSCAN algorithm     |
 |                     |      |                      |      |                      |
 +----------+----------+      +-----------+----------+      +-----------+----------+
            |                             |                             |
-           | When capacity               | After summarization         | After clustering
+           | When capacity               | After transfer              | After clustering
            | is reached                  |                             |
            ↓                             ↓                             ↓
 +-----------------------+    +-----------+----------+      +-----------+----------+
 |                       |    |                      |      |                      |
-| SUMMARIZATION & MOVE  |    |  EMBEDDING & MOVE    |      |     FORGETTING       |
+| MOVE OLDEST MEMORY    |    |  EMBEDDING & QUERY   |      |     SUMMARIZATION    |
 |                       |    |                      |      |                      |
-| LLM summarizes WM     |    | Convert to vectors   |      | Compare similarity   |
-| content and moves     +--->+ and store in LTM     |      | Remove redundant     |
-| to STM                |    | with metadata        +----->+ memories that exceed |
-|                       |    |                      |      | similarity threshold |
+| Transfer oldest       |    | Convert to vectors   |      | Summarize each       |
+| memory to STM         +--->+ for retrieval with   |      | cluster before       |
+| without summarizing   |    | forgetting mechanism +----->+ moving to LTM with   |
+|                       |    |                      |      | forgetting mechanism |
 +-----------------------+    +----------------------+      +----------------------+
 
                                           ↓
@@ -78,13 +78,13 @@ Memory flows through the system in a hierarchical manner, with summarization and
 1. **Working Memory (WM)**
    - Implemented as a simple FIFO (First-In-First-Out) queue with fixed capacity
    - No vector embeddings, just direct storage of text strings
-   - When capacity is reached, oldest memories are summarized and moved to Short-Term Memory
+   - When capacity is reached, oldest memory is moved to Short-Term Memory without summarization
    - Primary purpose: Immediate context and recent information processing
 
 2. **Short-Term Memory (STM)**
    - Implemented using vector embeddings for semantic similarity search
    - Limited capacity (larger than WM but smaller than LTM)
-   - When capacity is reached, content is summarized, clustered, and moved to Long-Term Memory
+   - When capacity is reached, content is clustered, summarized, and moved to Long-Term Memory
    - Primary purpose: Recent context retrieval and filtering information before long-term storage
 
 3. **Long-Term Memory (LTM)**
@@ -97,9 +97,9 @@ Memory flows through the system in a hierarchical manner, with summarization and
 
 #### Memory Flow
 1. New information enters Working Memory
-2. When WM reaches capacity, content is summarized via LLM and moved to Short-Term Memory
-3. When STM reaches capacity, content is summarized and moved to Long-Term Memory
-4. At each stage, memory is converted to vector embeddings (except for WM)
+2. When WM reaches capacity, the oldest memory is moved to Short-Term Memory (without summarization)
+3. When STM reaches capacity, content is clustered, summarized by cluster, and moved to Long-Term Memory
+4. At each stage, forgetting mechanisms manage memory retention
 
 #### Forgetting Mechanism
 The system implements a similarity-based forgetting algorithm:

@@ -46,5 +46,3 @@ dependencies:
           - torchvision
           - tqdm
           - transformers
-          # Memory architecture
-          - pinecone-client

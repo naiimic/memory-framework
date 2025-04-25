@@ -63,11 +63,6 @@ Type 'help' to see available commands.
         
         # Memory prompt templates
         memory_prompts = {
-            "workmem_to_shortmem": [
-                "The following are some memories from {name}:",
-                "{workmem}",
-                "Please summarize the above memories into one concise, informative passage that preserves the key information."
-            ],
             "shortmem_to_longmem": [
                 "The following are some memories from {name}:",
                 "{shortmem}",
@@ -108,7 +103,7 @@ Type 'help' to see available commands.
         
         # Show memory transitions if needed
         if self.memory.workmem_size_counter >= self.memory.workmem.capacity:
-            print("Working memory capacity reached - memories will be summarized on next update")
+            print("Working memory capacity reached - oldest memory will be transferred to short-term memory on next update")
             
         if self.memory.shortmem_size_counter >= self.memory.shortmem.capacity:
             print("Short-term memory capacity reached - memories will be summarized on next update")

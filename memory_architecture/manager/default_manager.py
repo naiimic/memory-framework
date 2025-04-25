@@ -107,10 +107,19 @@ class Memory(AbstractMemoryManager):
 
         if self.workmem_size_counter >= self.workmem.capacity:
             self.workmem_size_counter = 0
-            self.threaded_summarize(memory_from='workmem', memory_to='shortmem', counter_name='shortmem_size_counter')
+            # Take the oldest memory from workmem and move it to shortmem
+            # without summarization (only forgetting when memory enters)
+            oldest_memory = getattr(self, 'workmem').items[0]
+            getattr(self, 'shortmem').add(oldest_memory)
+            # Remove the oldest memory from workmem
+            self.workmem.items.pop(0)
+            if hasattr(self.workmem, 'items_embeddings') and len(self.workmem.items_embeddings) > 0:
+                self.workmem.items_embeddings = self.workmem.items_embeddings[1:]
+            setattr(self, 'shortmem_size_counter', getattr(self, 'shortmem').size)
 
         if self.shortmem_size_counter >= self.shortmem.capacity:
             self.shortmem_size_counter = 0
+            # Run clustering, summarize for each cluster, then send to longmem with forgetting
             self.threaded_summarize(memory_from='shortmem', memory_to='longmem')
             self.shortmem.clear()
 
@@ -174,7 +183,7 @@ class Memory(AbstractMemoryManager):
             except:
                 pass
 
-    def summarize(self, memory_from: str = "workmem", memory_to: str = "shortmem") -> str:
+    def summarize(self, memory_from: str = "shortmem", memory_to: str = "longmem") -> str:
         """Summarize memory_from and add to memory_to"""
         prompt_name = f"{memory_from}_to_{memory_to}"
 
@@ -314,13 +323,19 @@ class ChunkedMemory(AbstractMemoryManager):
 
         if self.workmem_size_counter >= self.workmem.capacity:
             self.workmem_size_counter = 0
-            for _mem in getattr(self, 'workmem').items:
-                getattr(self, 'shortmem').add(_mem)
-                # setattr(self, 'shortmem_size_counter', getattr(self, 'shortmem_size_counter') + 1)
+            # Take the oldest memory from workmem and move it to shortmem
+            # without summarization (only forgetting when memory enters)
+            oldest_memory = getattr(self, 'workmem').items[0]
+            getattr(self, 'shortmem').add(oldest_memory)
+            # Remove the oldest memory from workmem
+            self.workmem.items.pop(0)
+            if hasattr(self.workmem, 'items_embeddings') and len(self.workmem.items_embeddings) > 0:
+                self.workmem.items_embeddings = self.workmem.items_embeddings[1:]
             setattr(self, 'shortmem_size_counter', getattr(self, 'shortmem').size)
 
         if self.shortmem_size_counter >= self.shortmem.capacity:
             self.shortmem_size_counter = 0
+            # Run clustering, summarize for each cluster, then send to longmem with forgetting
             self.threaded_summarize(memory_from='shortmem', memory_to='longmem')
             self.shortmem.clear()
 
@@ -384,16 +399,11 @@ class ChunkedMemory(AbstractMemoryManager):
             except:
                 pass
 
-    def summarize(self, memory_from: str = "workmem", memory_to: str = "shortmem") -> str:
+    def summarize(self, memory_from: str = "shortmem", memory_to: str = "longmem") -> str:
         """Summarize memory_from and add to memory_to"""
 
         dbscan = DBSCAN(eps=0.55, min_samples=1)
         labels = dbscan.fit_predict(getattr(self, memory_from).items_embeddings)
-        # print recent memories
-        # for recentmem in self.recentmem.items:
-        #     print(f'{i}')
-        # print the embeddings
-        # print(f'embeddings={getattr(self, memory_from).items_embeddings}')
         
         clusters_dict = {}
         for idx, label in enumerate(labels):
@@ -408,9 +418,6 @@ class ChunkedMemory(AbstractMemoryManager):
         if memory_from == "shortmem":
             print(f'len_cluster_list={len(clusters_list)}, mean_elements={clusters_list}')
             self.num_cluster_average.append(len(clusters_list))
-            # for element in clusters_list:
-                # if len(element) >= 2:
-                #     self.num_element_list.append(clusters_list)
         
         prompt_name = f"{memory_from}_to_{memory_to}"
         all_items = getattr(self, memory_from).items
@@ -430,8 +437,6 @@ class ChunkedMemory(AbstractMemoryManager):
 
                 chain = self.setup_chain(customized_prompt=self.memory_prompts[prompt_name])
                 _mem.append(chain.run(chain_input))
-                
-        # print(f'_mem={_mem}')
         
         return _mem
 
