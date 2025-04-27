@@ -163,8 +163,8 @@ memory/
 
    **Using conda:**
    ```bash
-   conda env create -f environment.yaml -n memory
-   conda activate memory
+   conda env create -f environment.yaml -n memory-framework
+   conda activate memory-framework
    ```
 
 3. Configure your OpenAI API key:

@@ -197,26 +197,8 @@ class Memory(AbstractMemoryManager):
         return chain.run(chain_input)
 
     def add(self, content: Optional[Union[dict, str]], key: str = None) -> None:
-        if key == "sense":
-            self.add_senses(content)
-        elif key == "action":
-            self.add_actions(content)
-        else:
-            self.workmem.add(content)
-            self.workmem_size_counter += 1
-
-    def add_senses(self, sense_memories: Dict[str, str]) -> None:
-        time = sense_memories.get("time", "")
-        for key, sense_memory in sense_memories.items():
-            if sense_memory not in [None, "", " ", "\n", "."]:
-                formatted_memory = f"At {time}: {sense_memory}" if key != "talk" and key != "message" else sense_memory.replace("says", "said").replace("say", "said")
-                target_memory = self.workmem
-                target_memory.add(formatted_memory)
-                counter_name = "workmem_size_counter"
-                setattr(self, counter_name, getattr(self, counter_name) + 1)
-
-    def add_actions(self, action_memories: Dict[str, str]) -> None:
-        self.add_senses(action_memories)
+        self.workmem.add(content)
+        self.workmem_size_counter += 1
 
     def clear(self) -> None:
         for key in self.memory_keys:
@@ -441,26 +423,8 @@ class ChunkedMemory(AbstractMemoryManager):
         return _mem
 
     def add(self, content: Optional[Union[dict, str]], key: str = None) -> None:
-        if key == "sense":
-            self.add_senses(content)
-        elif key == "action":
-            self.add_actions(content)
-        else:
-            self.workmem.add(content)
-            self.workmem_size_counter += 1
-
-    def add_senses(self, sense_memories: Dict[str, str]) -> None:
-        time = sense_memories.get("time", "")
-        for key, sense_memory in sense_memories.items():
-            if sense_memory not in [None, "", " ", "\n", "."]:
-                formatted_memory = f"At {time}: {sense_memory}" if key != "talk" and key != "message" else sense_memory.replace("says", "said").replace("say", "said")
-                target_memory = self.workmem
-                target_memory.add(formatted_memory)
-                counter_name = "workmem_size_counter"
-                setattr(self, counter_name, getattr(self, counter_name) + 1)
-
-    def add_actions(self, action_memories: Dict[str, str]) -> None:
-        self.add_senses(action_memories)
+        self.workmem.add(content)
+        self.workmem_size_counter += 1
 
     def clear(self) -> None:
         for key in self.memory_keys:
